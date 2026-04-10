@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: docker/node/Dockerfile
-    container_name: ops-board-front
     volumes:
       - ./:/app
       - front_node_modules:/app/node_modules

@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -34,6 +35,12 @@ type AuthProviderProps = {
 export function AuthProvider({ initialUser, children }: AuthProviderProps) {
   const router = useRouter();
   const [user, setUser] = useState<Customer | null>(initialUser);
+
+  // Keep the client state in sync with the server-resolved user after every
+  // RSC refresh (login/logout mutations, cookie expiry, external navigation).
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
 
   const login = useCallback(
     async (payload: LoginPayload) => {

@@ -50,6 +50,14 @@ function readCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match.split("=")[1]) : undefined;
 }
 
+function readCookieFromHeader(
+  header: string,
+  name: string,
+): string | undefined {
+  const match = header.split("; ").find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.split("=")[1]) : undefined;
+}
+
 let csrfPromise: Promise<void> | null = null;
 
 async function ensureCsrf(): Promise<void> {
@@ -60,7 +68,15 @@ async function ensureCsrf(): Promise<void> {
       credentials: "include",
       headers: { Accept: "application/json" },
     })
-      .then(() => undefined)
+      .then((res) => {
+        if (!res.ok) {
+          throw new ApiError(
+            res.status,
+            `CSRF cookie request failed with status ${res.status}`,
+            null,
+          );
+        }
+      })
       .finally(() => {
         csrfPromise = null;
       });
@@ -80,14 +96,13 @@ async function parseBody(res: Response): Promise<unknown> {
 }
 
 function looksLikeValidationBody(body: unknown): body is ValidationErrorBody {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "message" in body &&
-    "errors" in body &&
-    typeof (body as { errors: unknown }).errors === "object"
-  );
+  if (typeof body !== "object" || body === null) return false;
+  if (!("message" in body) || !("errors" in body)) return false;
+  const errors = (body as { errors: unknown }).errors;
+  return typeof errors === "object" && errors !== null;
 }
+
+let warnedAboutMissingAppUrl = false;
 
 export async function apiFetch<T = unknown>(
   path: string,
@@ -97,7 +112,7 @@ export async function apiFetch<T = unknown>(
   const isMutation = MUTATING_METHODS.includes(method);
   const isServer = typeof window === "undefined";
 
-  if (isMutation) {
+  if (!isServer && isMutation) {
     await ensureCsrf();
   }
 
@@ -110,16 +125,31 @@ export async function apiFetch<T = unknown>(
     const token = readCookie("XSRF-TOKEN");
     if (token) finalHeaders.set("X-XSRF-TOKEN", token);
   }
-  if (cookie) finalHeaders.set("Cookie", cookie);
-  // Server-side calls go through the internal hostname, so we need to tell
-  // Laravel/Sanctum which public origin we represent to pass the stateful
-  // domain check.
-  if (isServer && PUBLIC_APP_URL) {
-    if (!finalHeaders.has("Origin")) {
-      finalHeaders.set("Origin", PUBLIC_APP_URL);
+  if (isServer && isMutation) {
+    const token = cookie
+      ? readCookieFromHeader(cookie, "XSRF-TOKEN")
+      : undefined;
+    if (!token) {
+      throw new Error(
+        "Server-side mutation requires a forwarded XSRF-TOKEN cookie; pass the request cookie via the `cookie` option.",
+      );
     }
-    if (!finalHeaders.has("Referer")) {
-      finalHeaders.set("Referer", `${PUBLIC_APP_URL}/`);
+    finalHeaders.set("X-XSRF-TOKEN", token);
+  }
+  if (cookie) finalHeaders.set("Cookie", cookie);
+  if (isServer) {
+    if (PUBLIC_APP_URL) {
+      if (!finalHeaders.has("Origin")) {
+        finalHeaders.set("Origin", PUBLIC_APP_URL);
+      }
+      if (!finalHeaders.has("Referer")) {
+        finalHeaders.set("Referer", `${PUBLIC_APP_URL}/`);
+      }
+    } else if (!warnedAboutMissingAppUrl) {
+      warnedAboutMissingAppUrl = true;
+      console.warn(
+        "[apiFetch] NEXT_PUBLIC_APP_URL not set — Sanctum stateful check may fail for SSR calls.",
+      );
     }
   }
 

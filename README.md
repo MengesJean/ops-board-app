@@ -31,7 +31,7 @@ app/
 
 components/
 ├── ui/                     # Composants shadcn
-├── auth/                   # LoginForm, RegisterForm, LogoutButton
+├── auth/                   # LoginForm, RegisterForm
 ├── layout/                 # AppSidebar, AppHeader, UserMenu
 └── theme/                  # ThemeProvider, ThemeToggle
 

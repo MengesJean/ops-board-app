@@ -7,10 +7,15 @@ import { fetchCurrentCustomer } from "@/lib/api/auth";
 import { isUnauthorized } from "@/lib/api/errors";
 import type { Customer } from "@/types/api";
 
+function shouldForwardCookie(name: string): boolean {
+  return name === "XSRF-TOKEN" || name.endsWith("_session");
+}
+
 export const getCurrentCustomer = cache(async (): Promise<Customer | null> => {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
+    .filter((c) => shouldForwardCookie(c.name))
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
 
@@ -19,11 +24,6 @@ export const getCurrentCustomer = cache(async (): Promise<Customer | null> => {
     return res.data;
   } catch (err) {
     if (isUnauthorized(err)) return null;
-    // Network or server errors bubble up in dev so we notice them; in prod we
-    // still treat the user as unauthenticated to avoid breaking protected pages.
-    if (process.env.NODE_ENV === "development") {
-      console.error("[getCurrentCustomer]", err);
-    }
-    return null;
+    throw err;
   }
 });

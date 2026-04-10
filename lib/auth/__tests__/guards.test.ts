@@ -34,6 +34,13 @@ describe("requireAuth", () => {
     await expect(requireAuth()).rejects.toThrow(/REDIRECT:\/login/);
     expect(redirectMock).toHaveBeenCalledWith("/login");
   });
+
+  it("bubbles unexpected errors from getCurrentCustomer", async () => {
+    const boom = new Error("backend down");
+    getCurrentCustomerMock.mockRejectedValue(boom);
+    await expect(requireAuth()).rejects.toBe(boom);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("requireGuest", () => {
