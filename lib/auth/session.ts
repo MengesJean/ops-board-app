@@ -8,7 +8,10 @@ import { isUnauthorized } from "@/lib/api/errors";
 import type { Customer } from "@/types/api";
 
 function shouldForwardCookie(name: string): boolean {
-  return name === "XSRF-TOKEN" || name.endsWith("_session");
+  if (name === "XSRF-TOKEN") return true;
+  // Laravel's session cookie name is configurable (SESSION_COOKIE) and may
+  // use either underscore or hyphen separators depending on APP_NAME.
+  return /session/i.test(name) || name.startsWith("remember_");
 }
 
 export const getCurrentCustomer = cache(async (): Promise<Customer | null> => {
