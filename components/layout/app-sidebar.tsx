@@ -22,7 +22,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 
 type NavItem = {
@@ -47,7 +46,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className={"border-b bg-background/80"}>
         <div className="flex items-center gap-2 px-2 py-1.5">
           <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold">
             O
@@ -57,7 +56,6 @@ export function AppSidebar() {
           </span>
         </div>
       </SidebarHeader>
-      <SidebarSeparator />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
