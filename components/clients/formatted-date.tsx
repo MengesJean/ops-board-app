@@ -1,31 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type FormattedDateProps = {
   iso: string;
 };
 
-// Render a timezone-sensitive date without hydration mismatches.
-// The first render (server + initial client) outputs the YYYY-MM-DD slice
-// of the ISO string — identical everywhere. After mount, the client swaps
-// it for a locale/timezone-aware version.
-export function FormattedDate({ iso }: FormattedDateProps) {
-  const fallback = iso.slice(0, 10);
-  const [label, setLabel] = useState(fallback);
+// Empty subscribe — we only care about the initial server vs. client snapshot.
+function subscribe() {
+  return () => {};
+}
 
-  useEffect(() => {
+function getSnapshot(): boolean {
+  return true;
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+// Render a timezone-sensitive date without hydration mismatches.
+// On the server (and the very first client render) we emit the YYYY-MM-DD
+// slice of the ISO string — identical everywhere. Once hydrated, the client
+// snapshot flips to `true` and the formatter takes over. `useSyncExternalStore`
+// avoids the setState-in-effect anti-pattern that the React lint rules flag.
+export function FormattedDate({ iso }: FormattedDateProps) {
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+
+  let label = iso.slice(0, 10);
+  if (mounted) {
     try {
-      const formatted = new Intl.DateTimeFormat(undefined, {
+      label = new Intl.DateTimeFormat(undefined, {
         year: "numeric",
         month: "short",
         day: "numeric",
       }).format(new Date(iso));
-      setLabel(formatted);
     } catch {
-      setLabel(fallback);
+      // fall back to the ISO slice
     }
-  }, [iso, fallback]);
+  }
 
   return (
     <time dateTime={iso} suppressHydrationWarning>

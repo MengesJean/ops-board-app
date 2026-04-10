@@ -2,7 +2,7 @@
 
 import { Plus, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,13 @@ export function ClientsToolbar({ search, status, onAdd }: ClientsToolbarProps) {
   const searchParams = useSearchParams();
   const [searchValue, setSearchValue] = useState(search);
 
+  // Always read the freshest searchParams inside the debounced callback so a
+  // concurrent status toggle doesn't get clobbered by a stale snapshot.
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
+
   // Keep local state synced if URL changes externally (back/forward nav).
   useEffect(() => {
     setSearchValue(search);
@@ -44,7 +51,9 @@ export function ClientsToolbar({ search, status, onAdd }: ClientsToolbarProps) {
   useEffect(() => {
     if (searchValue === search) return;
     const handle = setTimeout(() => {
-      const next = new URLSearchParams(searchParams?.toString() ?? "");
+      const next = new URLSearchParams(
+        searchParamsRef.current?.toString() ?? "",
+      );
       if (searchValue) next.set("search", searchValue);
       else next.delete("search");
       next.delete("page");
@@ -52,8 +61,7 @@ export function ClientsToolbar({ search, status, onAdd }: ClientsToolbarProps) {
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     }, 300);
     return () => clearTimeout(handle);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchValue]);
+  }, [searchValue, search, pathname, router]);
 
   const onStatusChange = (value: string | null) => {
     const next = new URLSearchParams(searchParams?.toString() ?? "");

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,10 +38,10 @@ describe("ClientsToolbar", () => {
     const user = userEvent.setup();
     render(<ClientsToolbar search="" status={null} onAdd={vi.fn()} />);
     await user.type(screen.getByLabelText(/search clients/i), "grace");
-    // Debounce is 300ms — wait a bit longer
-    await new Promise((r) => setTimeout(r, 400));
-    expect(replaceMock).toHaveBeenCalled();
-    const lastCall = replaceMock.mock.calls.at(-1)?.[0] as string;
-    expect(lastCall).toContain("search=grace");
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalled();
+      const lastCall = replaceMock.mock.calls.at(-1)?.[0] as string;
+      expect(lastCall).toContain("search=grace");
+    });
   });
 });

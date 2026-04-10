@@ -23,7 +23,7 @@ function parsePage(value: string | string[] | undefined): number {
 
 function parseSearch(value: string | string[] | undefined): string {
   if (typeof value !== "string") return "";
-  return value.slice(0, 200);
+  return value.trim().slice(0, 200);
 }
 
 export default async function ClientsPage(props: PageProps<"/clients">) {

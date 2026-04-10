@@ -135,8 +135,10 @@ export function ClientForm({
     } catch (err) {
       if (isValidationError(err)) {
         for (const [field, messages] of Object.entries(err.errors)) {
-          if (isFieldName(field) && messages[0]) {
-            form.setError(field, { message: messages[0] });
+          const message = messages[0];
+          if (message && isFieldName(field)) {
+            const name: FieldName = field;
+            form.setError(name, { message });
           }
         }
         setFormError(err.message);
@@ -243,8 +245,6 @@ export function ClientForm({
               ))}
             </SelectContent>
           </Select>
-          {/* Keep a hidden field so native form submit carries the value if ever needed */}
-          <input type="hidden" {...register("status")} />
           <FieldError errors={errors.status ? [errors.status] : undefined} />
         </Field>
 
