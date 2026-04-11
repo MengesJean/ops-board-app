@@ -229,6 +229,7 @@ export function ClientForm({
             Status
           </FieldLabel>
           <Select
+            items={STATUS_LABELS}
             value={statusValue}
             onValueChange={(value) => {
               if (value) {
