@@ -5,9 +5,11 @@ import { ProjectDetailView } from "@/components/projects/project-detail-view";
 import { ApiError } from "@/lib/api/errors";
 import { fetchProjectMilestones } from "@/lib/api/milestones";
 import { fetchProject } from "@/lib/api/projects";
+import { fetchProjectTasks } from "@/lib/api/tasks";
 import { buildForwardedCookieHeader } from "@/lib/auth/forward-cookies";
 import { requireAuth } from "@/lib/auth/guards";
 import { sortMilestonesByPosition } from "@/lib/milestones/formatters";
+import { sortTasksByPosition } from "@/lib/tasks/formatters";
 
 export const metadata = {
   title: "Project · OpsBoard",
@@ -27,10 +29,12 @@ export default async function ProjectDetailPage(
 
   let projectRes;
   let milestonesRes;
+  let tasksRes;
   try {
-    [projectRes, milestonesRes] = await Promise.all([
+    [projectRes, milestonesRes, tasksRes] = await Promise.all([
       fetchProject(id, { cookie }),
       fetchProjectMilestones(id, { cookie }),
+      fetchProjectTasks(id, undefined, { cookie }),
     ]);
   } catch (err) {
     if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
@@ -41,11 +45,16 @@ export default async function ProjectDetailPage(
 
   const project = projectRes.data;
   const milestones = sortMilestonesByPosition(milestonesRes.data);
+  const tasks = sortTasksByPosition(tasksRes.data);
 
   return (
     <>
       <AppHeader title={project.name} />
-      <ProjectDetailView project={project} milestones={milestones} />
+      <ProjectDetailView
+        project={project}
+        milestones={milestones}
+        tasks={tasks}
+      />
     </>
   );
 }

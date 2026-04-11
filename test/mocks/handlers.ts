@@ -6,6 +6,7 @@ import type {
   CreateClientPayload,
   CreateMilestonePayload,
   CreateProjectPayload,
+  CreateTaskPayload,
   Customer,
   Milestone,
   MilestoneStatus,
@@ -13,17 +14,26 @@ import type {
   ProjectHealth,
   ProjectPriority,
   ProjectStatus,
+  Task,
+  TaskPriority,
+  TaskStatus,
   UpdateClientPayload,
   UpdateMilestonePayload,
   UpdateProjectPayload,
+  UpdateTaskPayload,
 } from "@/types/api";
-import { MILESTONE_STATUSES } from "@/types/api";
+import {
+  MILESTONE_STATUSES,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from "@/types/api";
 import { mockClients, paginate } from "@/test/mocks/fixtures/clients";
 import { mockMilestones } from "@/test/mocks/fixtures/milestones";
 import {
   mockProjects,
   paginateProjects,
 } from "@/test/mocks/fixtures/projects";
+import { mockTasks } from "@/test/mocks/fixtures/tasks";
 
 const API = "http://localhost:9999";
 
@@ -77,11 +87,47 @@ export function getMilestonesStore(): Milestone[] {
   return milestonesStore;
 }
 
+let tasksStore: Task[] = mockTasks.map((t) => ({ ...t }));
+let nextTaskId = tasksStore.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+
+export function resetTasksStore(): void {
+  tasksStore = mockTasks.map((t) => ({ ...t }));
+  nextTaskId = tasksStore.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+}
+
+export function getTasksStore(): Task[] {
+  return tasksStore;
+}
+
 function isMilestoneStatus(value: unknown): value is MilestoneStatus {
   return (
     typeof value === "string" &&
     (MILESTONE_STATUSES as readonly string[]).includes(value)
   );
+}
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return (
+    typeof value === "string" &&
+    (TASK_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+function isTaskPriority(value: unknown): value is TaskPriority {
+  return (
+    typeof value === "string" &&
+    (TASK_PRIORITIES as readonly string[]).includes(value)
+  );
+}
+
+function applyTaskCompletedAt(
+  previousStatus: TaskStatus | null,
+  nextStatus: TaskStatus,
+  previousCompletedAt: string | null,
+): string | null {
+  if (previousStatus === nextStatus) return previousCompletedAt;
+  if (nextStatus === "done") return previousCompletedAt ?? nowIso();
+  return null;
 }
 
 function applyCompletedAtTransition(
@@ -602,6 +648,286 @@ export const handlers = [
         return HttpResponse.json({ message: "Not found." }, { status: 404 });
       }
       milestonesStore = milestonesStore.filter((m) => m.id !== milestoneId);
+      return new HttpResponse(null, { status: 204 });
+    },
+  ),
+
+  // Task — reorder must be declared BEFORE the :taskId routes so MSW
+  // matches the literal segment first.
+  http.patch(
+    `${API}/api/projects/:projectId/tasks/reorder`,
+    async ({ params, request }) => {
+      const projectId = Number(params.projectId);
+      const project = projectsStore.find((p) => p.id === projectId);
+      if (!project) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      const body = (await request.json()) as { task_ids?: unknown };
+      const ids = Array.isArray(body.task_ids)
+        ? body.task_ids.filter((v): v is number => typeof v === "number")
+        : [];
+      const projectTasks = tasksStore.filter((t) => t.project_id === projectId);
+      const expectedCount = projectTasks.length;
+      const idSet = new Set(ids);
+      const allBelong = ids.every((id) =>
+        projectTasks.some((t) => t.id === id),
+      );
+      if (
+        ids.length !== expectedCount ||
+        idSet.size !== ids.length ||
+        !allBelong
+      ) {
+        return HttpResponse.json(
+          {
+            message: `The task_ids list must contain exactly ${expectedCount} entries (one per existing task).`,
+            errors: {
+              task_ids: [
+                `The task_ids list must contain exactly ${expectedCount} entries (one per existing task).`,
+              ],
+            },
+          },
+          { status: 422 },
+        );
+      }
+      const now = nowIso();
+      const reordered: Task[] = ids.map((id, index) => {
+        const current = projectTasks.find((t) => t.id === id) as Task;
+        return { ...current, position: index + 1, updated_at: now };
+      });
+      tasksStore = [
+        ...tasksStore.filter((t) => t.project_id !== projectId),
+        ...reordered,
+      ];
+      return HttpResponse.json({ data: reordered }, { status: 200 });
+    },
+  ),
+
+  http.get(
+    `${API}/api/projects/:projectId/tasks`,
+    ({ params, request }) => {
+      const projectId = Number(params.projectId);
+      const project = projectsStore.find((p) => p.id === projectId);
+      if (!project) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      const url = new URL(request.url);
+      const status = url.searchParams.get("status");
+      const priority = url.searchParams.get("priority");
+      const milestoneId = url.searchParams.get("project_milestone_id");
+      const search = url.searchParams.get("search")?.toLowerCase().trim() ?? "";
+
+      let filtered = tasksStore.filter((t) => t.project_id === projectId);
+      if (status && isTaskStatus(status)) {
+        filtered = filtered.filter((t) => t.status === status);
+      }
+      if (priority && isTaskPriority(priority)) {
+        filtered = filtered.filter((t) => t.priority === priority);
+      }
+      if (milestoneId !== null) {
+        const mid = Number(milestoneId);
+        filtered = filtered.filter((t) => t.project_milestone_id === mid);
+      }
+      if (search) {
+        filtered = filtered.filter((t) =>
+          t.title.toLowerCase().includes(search),
+        );
+      }
+      const data = [...filtered].sort((a, b) => a.position - b.position);
+      return HttpResponse.json({ data }, { status: 200 });
+    },
+  ),
+
+  http.post(
+    `${API}/api/projects/:projectId/tasks`,
+    async ({ params, request }) => {
+      const projectId = Number(params.projectId);
+      const project = projectsStore.find((p) => p.id === projectId);
+      if (!project) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      const body = (await request.json()) as CreateTaskPayload;
+      const errors: Record<string, string[]> = {};
+      if (!body.title || body.title.trim() === "") {
+        errors.title = ["The title field is required."];
+      }
+      if (!isTaskStatus(body.status)) {
+        errors.status = ["The selected status is invalid."];
+      }
+      if (!isTaskPriority(body.priority)) {
+        errors.priority = ["The selected priority is invalid."];
+      }
+      if (
+        body.project_milestone_id !== undefined &&
+        body.project_milestone_id !== null
+      ) {
+        const belongs = milestonesStore.some(
+          (m) =>
+            m.id === body.project_milestone_id && m.project_id === projectId,
+        );
+        if (!belongs) {
+          errors.project_milestone_id = [
+            "The selected milestone does not belong to this project.",
+          ];
+        }
+      }
+      if (Object.keys(errors).length > 0) {
+        return HttpResponse.json(
+          { message: "The given data was invalid.", errors },
+          { status: 422 },
+        );
+      }
+      const projectTasks = tasksStore.filter((t) => t.project_id === projectId);
+      const nextPosition =
+        projectTasks.reduce((max, t) => Math.max(max, t.position), 0) + 1;
+      const status = body.status as TaskStatus;
+      const completed_at = status === "done" ? nowIso() : null;
+      const task: Task = {
+        id: nextTaskId++,
+        project_id: projectId,
+        project_milestone_id: body.project_milestone_id ?? null,
+        title: body.title.trim(),
+        description: body.description ?? null,
+        status,
+        priority: body.priority as TaskPriority,
+        position: nextPosition,
+        due_date: body.due_date ?? null,
+        completed_at,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      tasksStore = [...tasksStore, task];
+      return HttpResponse.json({ data: task }, { status: 201 });
+    },
+  ),
+
+  http.get(
+    `${API}/api/projects/:projectId/tasks/:taskId`,
+    ({ params }) => {
+      const projectId = Number(params.projectId);
+      const taskId = Number(params.taskId);
+      const task = tasksStore.find(
+        (t) => t.id === taskId && t.project_id === projectId,
+      );
+      if (!task) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      return HttpResponse.json({ data: task }, { status: 200 });
+    },
+  ),
+
+  http.patch(
+    `${API}/api/projects/:projectId/tasks/:taskId`,
+    async ({ params, request }) => {
+      const projectId = Number(params.projectId);
+      const taskId = Number(params.taskId);
+      const index = tasksStore.findIndex(
+        (t) => t.id === taskId && t.project_id === projectId,
+      );
+      if (index === -1) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      const body = (await request.json()) as UpdateTaskPayload;
+      const current = tasksStore[index];
+      if (body.title !== undefined && body.title.trim() === "") {
+        return HttpResponse.json(
+          {
+            message: "The given data was invalid.",
+            errors: { title: ["The title field is required."] },
+          },
+          { status: 422 },
+        );
+      }
+      if (body.status !== undefined && !isTaskStatus(body.status)) {
+        return HttpResponse.json(
+          {
+            message: "The given data was invalid.",
+            errors: { status: ["The selected status is invalid."] },
+          },
+          { status: 422 },
+        );
+      }
+      if (body.priority !== undefined && !isTaskPriority(body.priority)) {
+        return HttpResponse.json(
+          {
+            message: "The given data was invalid.",
+            errors: { priority: ["The selected priority is invalid."] },
+          },
+          { status: 422 },
+        );
+      }
+      if (
+        body.project_milestone_id !== undefined &&
+        body.project_milestone_id !== null
+      ) {
+        const belongs = milestonesStore.some(
+          (m) =>
+            m.id === body.project_milestone_id && m.project_id === projectId,
+        );
+        if (!belongs) {
+          return HttpResponse.json(
+            {
+              message: "The given data was invalid.",
+              errors: {
+                project_milestone_id: [
+                  "The selected milestone does not belong to this project.",
+                ],
+              },
+            },
+            { status: 422 },
+          );
+        }
+      }
+      const nextStatus =
+        body.status !== undefined ? (body.status as TaskStatus) : current.status;
+      const completed_at = applyTaskCompletedAt(
+        current.status,
+        nextStatus,
+        current.completed_at,
+      );
+      const updated: Task = {
+        ...current,
+        title: body.title !== undefined ? body.title.trim() : current.title,
+        description:
+          body.description === undefined
+            ? current.description
+            : (body.description ?? null),
+        status: nextStatus,
+        priority:
+          body.priority !== undefined
+            ? (body.priority as TaskPriority)
+            : current.priority,
+        due_date:
+          body.due_date === undefined
+            ? current.due_date
+            : (body.due_date ?? null),
+        project_milestone_id:
+          body.project_milestone_id === undefined
+            ? current.project_milestone_id
+            : (body.project_milestone_id ?? null),
+        completed_at,
+        updated_at: nowIso(),
+      };
+      tasksStore = [
+        ...tasksStore.slice(0, index),
+        updated,
+        ...tasksStore.slice(index + 1),
+      ];
+      return HttpResponse.json({ data: updated }, { status: 200 });
+    },
+  ),
+
+  http.delete(
+    `${API}/api/projects/:projectId/tasks/:taskId`,
+    ({ params }) => {
+      const projectId = Number(params.projectId);
+      const taskId = Number(params.taskId);
+      const exists = tasksStore.some(
+        (t) => t.id === taskId && t.project_id === projectId,
+      );
+      if (!exists) {
+        return HttpResponse.json({ message: "Not found." }, { status: 404 });
+      }
+      tasksStore = tasksStore.filter((t) => t.id !== taskId);
       return new HttpResponse(null, { status: 204 });
     },
   ),

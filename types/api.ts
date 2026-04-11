@@ -191,3 +191,46 @@ export type UpdateMilestonePayload = Partial<CreateMilestonePayload>;
 export type ReorderMilestonesPayload = {
   milestone_ids: number[];
 };
+
+export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_PRIORITIES = ["low", "medium", "high"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export type Task = {
+  id: number;
+  project_id: number;
+  project_milestone_id: number | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  position: number;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateTaskPayload = {
+  title: string;
+  description?: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date?: string | null;
+  project_milestone_id?: number | null;
+};
+
+export type UpdateTaskPayload = Partial<CreateTaskPayload>;
+
+export type ReorderTasksPayload = {
+  task_ids: number[];
+};
+
+export type TaskFilters = {
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  project_milestone_id?: number;
+  search?: string;
+};

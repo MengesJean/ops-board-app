@@ -7,6 +7,7 @@ import {
   resetClientsStore,
   resetMilestonesStore,
   resetProjectsStore,
+  resetTasksStore,
 } from "./mocks/handlers";
 import { server } from "./mocks/server";
 
@@ -61,6 +62,7 @@ afterEach(() => {
   resetClientsStore();
   resetProjectsStore();
   resetMilestonesStore();
+  resetTasksStore();
 });
 
 afterAll(() => {
