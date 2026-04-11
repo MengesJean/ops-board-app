@@ -1,0 +1,40 @@
+import type { Milestone } from "@/types/api";
+
+export const mockMilestones: Milestone[] = [
+  {
+    id: 501,
+    project_id: 101,
+    title: "Discovery",
+    description: "Stakeholder interviews and scoping.",
+    status: "done",
+    position: 1,
+    due_date: "2026-03-15",
+    completed_at: "2026-03-14T16:30:00+00:00",
+    created_at: "2026-02-01T09:00:00+00:00",
+    updated_at: "2026-03-14T16:30:00+00:00",
+  },
+  {
+    id: 502,
+    project_id: 101,
+    title: "Design ready",
+    description: "All wireframes signed off by stakeholders.",
+    status: "in_progress",
+    position: 2,
+    due_date: "2026-04-30",
+    completed_at: null,
+    created_at: "2026-02-01T09:00:00+00:00",
+    updated_at: "2026-04-05T10:00:00+00:00",
+  },
+  {
+    id: 503,
+    project_id: 101,
+    title: "Client UAT",
+    description: null,
+    status: "pending",
+    position: 3,
+    due_date: "2026-06-15",
+    completed_at: null,
+    created_at: "2026-02-01T09:00:00+00:00",
+    updated_at: "2026-02-01T09:00:00+00:00",
+  },
+];

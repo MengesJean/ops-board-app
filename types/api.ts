@@ -158,3 +158,36 @@ export type ProjectFilters = {
   page?: number;
   per_page?: number;
 };
+
+export const MILESTONE_STATUSES = [
+  "pending",
+  "in_progress",
+  "done",
+] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+
+export type Milestone = {
+  id: number;
+  project_id: number;
+  title: string;
+  description: string | null;
+  status: MilestoneStatus;
+  position: number;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateMilestonePayload = {
+  title: string;
+  description?: string | null;
+  status: MilestoneStatus;
+  due_date?: string | null;
+};
+
+export type UpdateMilestonePayload = Partial<CreateMilestonePayload>;
+
+export type ReorderMilestonesPayload = {
+  milestone_ids: number[];
+};
