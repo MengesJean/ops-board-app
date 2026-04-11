@@ -8,8 +8,8 @@ import { mockClients } from "@/test/mocks/fixtures/clients";
 describe("ClientForm (create mode)", () => {
   it("renders empty fields and a Create button", () => {
     render(<ClientForm onSuccess={vi.fn()} />);
-    expect(screen.getByLabelText(/^name$/i)).toHaveValue("");
-    expect(screen.getByLabelText(/^email$/i)).toHaveValue("");
+    expect(screen.getByLabelText(/^name\s*\*?$/i)).toHaveValue("");
+    expect(screen.getByLabelText(/^email\s*\*?$/i)).toHaveValue("");
     expect(
       screen.getByRole("button", { name: /create client/i }),
     ).toBeEnabled();
@@ -28,8 +28,8 @@ describe("ClientForm (create mode)", () => {
     const onSuccess = vi.fn();
     const user = userEvent.setup();
     render(<ClientForm onSuccess={onSuccess} />);
-    await user.type(screen.getByLabelText(/^name$/i), "Brand New Client");
-    await user.type(screen.getByLabelText(/^email$/i), "brand@example.com");
+    await user.type(screen.getByLabelText(/^name\s*\*?$/i), "Brand New Client");
+    await user.type(screen.getByLabelText(/^email\s*\*?$/i), "brand@example.com");
     await user.click(screen.getByRole("button", { name: /create client/i }));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     const created = onSuccess.mock.calls[0][0];
@@ -40,8 +40,8 @@ describe("ClientForm (create mode)", () => {
   it("maps 422 backend errors onto fields", async () => {
     const user = userEvent.setup();
     render(<ClientForm onSuccess={vi.fn()} />);
-    await user.type(screen.getByLabelText(/^name$/i), "Duplicate");
-    await user.type(screen.getByLabelText(/^email$/i), "taken@example.com");
+    await user.type(screen.getByLabelText(/^name\s*\*?$/i), "Duplicate");
+    await user.type(screen.getByLabelText(/^email\s*\*?$/i), "taken@example.com");
     await user.click(screen.getByRole("button", { name: /create client/i }));
     expect(
       await screen.findByText(/email has already been taken/i),
@@ -52,8 +52,8 @@ describe("ClientForm (create mode)", () => {
 describe("ClientForm (edit mode)", () => {
   it("pre-fills fields from initialClient", () => {
     render(<ClientForm initialClient={mockClients[0]} onSuccess={vi.fn()} />);
-    expect(screen.getByLabelText(/^name$/i)).toHaveValue(mockClients[0].name);
-    expect(screen.getByLabelText(/^email$/i)).toHaveValue(
+    expect(screen.getByLabelText(/^name\s*\*?$/i)).toHaveValue(mockClients[0].name);
+    expect(screen.getByLabelText(/^email\s*\*?$/i)).toHaveValue(
       mockClients[0].email ?? "",
     );
     expect(
@@ -67,7 +67,7 @@ describe("ClientForm (edit mode)", () => {
     render(
       <ClientForm initialClient={mockClients[0]} onSuccess={onSuccess} />,
     );
-    const nameInput = screen.getByLabelText(/^name$/i);
+    const nameInput = screen.getByLabelText(/^name\s*\*?$/i);
     await user.clear(nameInput);
     await user.type(nameInput, "Grace Hopper Jr.");
     await user.click(screen.getByRole("button", { name: /save changes/i }));

@@ -41,10 +41,9 @@ const clientSchema = z.object({
   company_name: z.string().max(255, "Company name is too long").optional(),
   email: z
     .string()
+    .min(1, "Email is required")
     .max(255, "Email is too long")
-    .email("Enter a valid email")
-    .optional()
-    .or(z.literal("")),
+    .email("Enter a valid email"),
   phone: z.string().max(50, "Phone is too long").optional(),
   status: z.enum(CLIENT_STATUSES),
   notes: z.string().max(2000, "Notes are too long").optional(),
@@ -84,7 +83,7 @@ function toPayload(
   return {
     name: values.name.trim(),
     company_name: values.company_name?.trim() ? values.company_name.trim() : null,
-    email: values.email?.trim() ? values.email.trim() : null,
+    email: values.email.trim(),
     phone: values.phone?.trim() ? values.phone.trim() : null,
     status: values.status,
     notes: values.notes?.trim() ? values.notes.trim() : null,
@@ -174,7 +173,9 @@ export function ClientForm({
         )}
 
         <Field data-invalid={errors.name ? true : undefined}>
-          <FieldLabel htmlFor="client-name">Name</FieldLabel>
+          <FieldLabel htmlFor="client-name" required>
+            Name
+          </FieldLabel>
           <Input
             id="client-name"
             autoComplete="off"
@@ -198,7 +199,9 @@ export function ClientForm({
         </Field>
 
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="client-email">Email</FieldLabel>
+          <FieldLabel htmlFor="client-email" required>
+            Email
+          </FieldLabel>
           <Input
             id="client-email"
             type="email"
@@ -222,7 +225,9 @@ export function ClientForm({
         </Field>
 
         <Field data-invalid={errors.status ? true : undefined}>
-          <FieldLabel htmlFor="client-status">Status</FieldLabel>
+          <FieldLabel htmlFor="client-status" required>
+            Status
+          </FieldLabel>
           <Select
             value={statusValue}
             onValueChange={(value) => {
