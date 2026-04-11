@@ -127,8 +127,49 @@ export type Project = {
   budget: string | null;
   notes: string | null;
   client?: ProjectClientEmbed;
+  progress?: ProjectProgress;
+  tasks_count?: number;
+  completed_tasks_count?: number;
   created_at: string;
   updated_at: string;
+};
+
+export type NextDueRef = {
+  id: number;
+  title: string;
+  due_date: string;
+} | null;
+
+export type ProjectProgress = {
+  total_tasks: number;
+  todo_tasks: number;
+  in_progress_tasks: number;
+  completed_tasks: number;
+  overdue_tasks: number;
+  completion_rate: number;
+  has_tasks: boolean;
+  total_milestones: number;
+  completed_milestones: number;
+  next_due_task: NextDueRef;
+  next_due_milestone: NextDueRef;
+  is_overdue: boolean;
+};
+
+export type MilestoneProgress = {
+  id: number;
+  title: string;
+  status: MilestoneStatus;
+  position: number;
+  due_date: string | null;
+  completed_at: string | null;
+  total_tasks: number;
+  completed_tasks: number;
+  completion_rate: number | null;
+};
+
+export type ProjectProgressDetail = {
+  project: ProjectProgress;
+  milestones: MilestoneProgress[];
 };
 
 export type CreateProjectPayload = {
@@ -233,4 +274,96 @@ export type TaskFilters = {
   priority?: TaskPriority;
   project_milestone_id?: number;
   search?: string;
+};
+
+export type ActivitySubjectType = "task" | "milestone" | "project" | "client";
+
+export type ActivitySubject = {
+  type: ActivitySubjectType;
+  id: number;
+  label: string | null;
+};
+
+export type ActivityActor = {
+  type: "customer" | "user";
+  id: number;
+  name: string;
+} | null;
+
+export type ActivityLogEntry = {
+  id: number;
+  event: string;
+  subject: ActivitySubject;
+  project_id: number;
+  actor: ActivityActor;
+  properties: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ActivityFilters = {
+  page?: number;
+  per_page?: number;
+};
+
+export type DashboardStats = {
+  active_projects_count: number;
+  completed_projects_count: number;
+  warning_projects_count: number;
+  critical_projects_count: number;
+  overdue_tasks_count: number;
+  due_today_tasks_count: number;
+  upcoming_milestones_count: number;
+  global_completion_rate: number;
+};
+
+export type DashboardProjectRef = {
+  id: number;
+  name: string;
+};
+
+export type DashboardOverdueTask = {
+  id: number;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: string | null;
+  project: DashboardProjectRef;
+};
+
+export type DashboardUpcomingMilestone = {
+  id: number;
+  title: string;
+  status: MilestoneStatus;
+  due_date: string | null;
+  project: DashboardProjectRef;
+};
+
+export type DashboardProjectSummary = {
+  id: number;
+  name: string;
+  status: ProjectStatus;
+  health: ProjectHealth;
+  priority: ProjectPriority;
+  due_date: string | null;
+  is_overdue: boolean;
+  client: { id: number; name: string } | null;
+  progress: {
+    total_tasks: number;
+    completed_tasks: number;
+    completion_rate: number;
+  };
+};
+
+export type DashboardPriorities = {
+  overdue_tasks: DashboardOverdueTask[];
+  due_today_tasks: DashboardOverdueTask[];
+  upcoming_milestones: DashboardUpcomingMilestone[];
+  at_risk_projects: DashboardProjectSummary[];
+};
+
+export type DashboardPayload = {
+  stats: DashboardStats;
+  priorities: DashboardPriorities;
+  projects: DashboardProjectSummary[];
+  recent_activity: ActivityLogEntry[];
 };

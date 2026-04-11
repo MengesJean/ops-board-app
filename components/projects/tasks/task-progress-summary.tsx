@@ -1,3 +1,4 @@
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { cn } from "@/lib/utils";
 import {
   TASK_STATUS_DOTS,
@@ -50,19 +51,12 @@ export function TaskProgressSummary({
           </span>
         ))}
       </div>
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        aria-label={`${percent}% of tasks done`}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="h-full rounded-full bg-emerald-500 transition-all"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={percent}
+        size="md"
+        tone="emerald"
+        label={`${percent}% of tasks done`}
+      />
     </div>
   );
 }
