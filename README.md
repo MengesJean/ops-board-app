@@ -1,6 +1,59 @@
+> **Projet de démo portfolio.** OpsBoard est un projet de démonstration développé pour mon portfolio : [www.mengesjean.fr](https://www.mengesjean.fr). Il n'a pas vocation à être déployé en production — c'est un terrain d'expérimentation pour montrer une stack moderne, des patterns d'architecture propres et une vraie réflexion produit.
+
 # OpsBoard — Frontend
 
-Interface Next.js d'OpsBoard. Côté applicatif (auth, dashboard, features métier), face à l'API Laravel du repo `../api`.
+Interface Next.js d'**OpsBoard**, un outil de pilotage métier qui permet à un freelance ou une petite équipe de gérer ses clients, ses projets et l'avancement opérationnel au quotidien. Le front consomme l'API Laravel du repo `../api` via Sanctum (SPA stateful) et offre une UX résolument tournée vers l'**aide à la décision** : où en est ce projet, qu'est-ce qui bloque, quelles sont les priorités du moment.
+
+## Fonctionnalités
+
+### Authentification
+- Inscription, connexion, déconnexion via Laravel Sanctum **SPA stateful** (cookies de session, pas de Bearer token, pas de `localStorage`).
+- Guards `requireAuth` / `requireGuest` côté Server Components, **zéro flash d'état auth**.
+- Hydratation server-side du customer connecté.
+
+### Gestion des Clients
+- Liste, recherche, filtres par statut (`lead` / `active` / `inactive`).
+- CRUD complet avec validation Zod + react-hook-form.
+- Pagination, empty states, états loading et error.
+
+### Gestion des Projects
+- Liste paginée avec recherche et filtres (statut, priorité, health, client).
+- Page projet `/projects/[id]` enrichie : header, overview cards, progression, milestones, tasks, activity.
+- CRUD complet, badges visuels pour `status` / `priority` / `health`, alerte projet en retard.
+
+### Project Milestones (jalons)
+- Roadmap visuelle des étapes structurantes du projet.
+- CRUD, changement de statut (`pending` / `in_progress` / `done`), réordonnancement.
+- Mise à jour optimiste (rollback en cas d'erreur API).
+
+### Tasks (unités opérationnelles)
+- Tasks rattachées à un projet, optionnellement liées à un milestone.
+- Statut (`todo` / `in_progress` / `done`), priorité, due date, réordonnancement.
+- Filtres par statut / priorité / milestone, recherche par titre.
+- Détection automatique des tasks en retard.
+
+### Project Progression
+- Section dédiée sur la page projet : barre de progression globale, KPI compacts (Total / Completed / In progress / To do / Remaining / Overdue).
+- Indicateurs auxiliaires : prochaine task due, prochain milestone, alerte projet en retard.
+- Breakdown par milestone avec mini-progress bars (gestion du cas "milestone vide").
+- États propres : empty, error, données partielles tolérées.
+
+### Activity Log
+- Timeline verticale "Recent activity" sur la page projet.
+- Humanisation des événements bruts du backend (`task.status_changed`, `task.completed`, `milestone.created`, `project.created`, etc.) avec libellés lisibles, transitions `from → to`, acteur, date relative.
+- Helper `formatRelativeTime` maison ("just now", "5m ago", "2h ago", "3d ago", date courte au-delà).
+- Empty state, error state, résistant aux échecs partiels du backend.
+
+### Dashboard enrichi
+- 4 cards KPI principales : Active projects, Projects at risk, Overdue tasks, Due today.
+- 2 sub-stats : Upcoming milestones (7 jours), Global completion rate (avec barre).
+- Section **Priorities** en grille 2x2 : Overdue tasks, Due today, Upcoming milestones, Projects at risk — chaque item cliquable vers le projet concerné.
+- Section **Projects to watch** : sélection des projets actifs avec progress bar, health, due date.
+- Section **Recent activity** : timeline globale multi-projets.
+- Loading skeleton + error fallback gracieux.
+
+### Thème
+- Dark / light / system avec persistance (`next-themes`), zéro flash de thème grâce à `useSyncExternalStore`.
 
 ## Stack
 
@@ -123,14 +176,14 @@ npm run test:ui      # vitest avec interface web
 
 ## Tests
 
-Vitest + React Testing Library + MSW couvrent :
+Vitest + React Testing Library + MSW. **187 tests** couvrent :
 
-- **Formulaires d'auth** : rendu, validation zod (email, password, confirmation), succès, mapping des erreurs 422 du backend
-- **`useAuth`** : hydratation initiale, login → user, logout → null
-- **Guards** : `requireAuth` et `requireGuest` avec leur `redirect()`
-- **ThemeToggle** : rendu et ouverture du menu
+- **Auth** : formulaires (login / register, validation zod, mapping erreurs 422), `useAuth`, guards `requireAuth` / `requireGuest`, ThemeToggle.
+- **API services** : clients, projects, milestones, tasks, activity, dashboard — chaque service testé contre des handlers MSW qui simulent un backend stateful (CRUD complet, validation, pagination, reorder).
+- **Domain helpers** : formatters (status, priority, health, budget, relative time), calculs de progression (par projet, par milestone), humanisation des events d'activity.
+- **Composants métier** : tables, toolbars, formulaires, dialogs de suppression, sections de progression, timelines d'activity, vue dashboard complète, barre de progression partagée.
 
-Les appels réseau sont mockés via MSW — aucune requête réelle n'est émise en test. Les Server Components async ne sont pas testés via Vitest (limitation connue) ; les guards qui les composent sont testés en isolation.
+Les appels réseau sont mockés via **MSW** — aucune requête réelle n'est émise en test. Les Server Components async ne sont pas testés via Vitest (limitation connue) ; les guards qui les composent sont testés en isolation.
 
 ```bash
 npm test
@@ -159,12 +212,14 @@ SANCTUM_STATEFUL_DOMAINS=app.ops-board.dev.localhost
 
 Et dans `api/config/cors.php`, `allowed_origins` doit contenir `https://app.ops-board.dev.localhost` avec `supports_credentials: true`.
 
-## Prochaines étapes
+## Ajouter une feature métier
 
-Pour brancher une nouvelle feature métier :
+Pour brancher proprement une nouvelle feature dans l'app :
 
 1. **Nouvelle route protégée** : créer `app/(protected)/<feature>/page.tsx`. Le guard d'auth est hérité du layout parent.
 2. **Nouvel appel API** : ajouter un module `lib/api/<feature>.ts` qui réutilise `apiFetch` — toute la gestion CSRF / session / erreurs est centralisée.
-3. **Typage** : ajouter les types dans `types/api.ts`, utiliser `ApiResource<T>` pour les réponses `{ data: ... }`.
-4. **Sidebar** : les entrées `Interventions / Clients / Reports / Settings` sont déjà déclarées dans `components/layout/app-sidebar.tsx` — il suffit de créer les pages correspondantes.
-5. **Fetch SSR authentifié** : `apiFetch('/api/...', { cookie: (await cookies()).toString() })` depuis un Server Component.
+3. **Typage** : ajouter les types dans `types/api.ts`, utiliser `ApiResource<T>` pour les réponses `{ data: ... }` et `PaginatedResource<T>` pour les listes paginées.
+4. **Domain helpers** : formatters / calculs sous `lib/<feature>/`. Tests co-localisés dans `__tests__/`.
+5. **Composants** : sous `components/<feature>/`, en réutilisant les primitives shadcn (`card`, `badge`, `button`, `progress-bar`, `alert`, `skeleton`, etc.) et les patterns existants (empty state dashed, optimistic update + rollback, error/loading state local).
+6. **Mocks de tests** : étendre `test/mocks/handlers.ts` + `test/mocks/fixtures/` pour pouvoir tester la feature de bout en bout sans backend réel.
+7. **Fetch SSR authentifié** : `apiFetch('/api/...', { cookie: await buildForwardedCookieHeader() })` depuis un Server Component.

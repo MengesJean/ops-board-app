@@ -9,10 +9,12 @@ import type {
   CreateTaskPayload,
   Customer,
   Milestone,
+  MilestoneProgress,
   MilestoneStatus,
   Project,
   ProjectHealth,
   ProjectPriority,
+  ProjectProgress,
   ProjectStatus,
   Task,
   TaskPriority,
@@ -34,6 +36,11 @@ import {
   paginateProjects,
 } from "@/test/mocks/fixtures/projects";
 import { mockTasks } from "@/test/mocks/fixtures/tasks";
+import {
+  mockProjectActivity,
+  paginateActivity,
+} from "@/test/mocks/fixtures/activity";
+import { mockDashboard } from "@/test/mocks/fixtures/dashboard";
 
 const API = "http://localhost:9999";
 
@@ -152,6 +159,91 @@ function clientEmbed(clientId: number): Project["client"] {
 
 function nowIso(): string {
   return new Date("2026-04-11T12:00:00+00:00").toISOString();
+}
+
+function isTaskOverdueForProgress(task: Task): boolean {
+  if (task.status === "done") return false;
+  if (!task.due_date) return false;
+  const due = new Date(`${task.due_date}T23:59:59`).getTime();
+  if (!Number.isFinite(due)) return false;
+  return due < new Date("2026-04-11T12:00:00+00:00").getTime();
+}
+
+function computeProjectProgress(projectId: number): ProjectProgress {
+  const tasks = tasksStore.filter((t) => t.project_id === projectId);
+  const milestones = milestonesStore.filter((m) => m.project_id === projectId);
+  const todo = tasks.filter((t) => t.status === "todo").length;
+  const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+  const completed = tasks.filter((t) => t.status === "done").length;
+  const overdue = tasks.filter(isTaskOverdueForProgress).length;
+  const total = tasks.length;
+  const completionRate = total === 0 ? 0 : completed / total;
+  const completedMilestones = milestones.filter((m) => m.status === "done").length;
+  const nextDueTask = tasks
+    .filter((t) => t.status !== "done" && t.due_date)
+    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))[0];
+  const nextDueMilestone = milestones
+    .filter((m) => m.status !== "done" && m.due_date)
+    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))[0];
+  const project = projectsStore.find((p) => p.id === projectId);
+  const isOverdue = (() => {
+    if (!project?.due_date) return false;
+    if (project.status === "completed" || project.status === "cancelled") return false;
+    const due = new Date(`${project.due_date}T23:59:59`).getTime();
+    return due < new Date("2026-04-11T12:00:00+00:00").getTime();
+  })();
+  return {
+    total_tasks: total,
+    todo_tasks: todo,
+    in_progress_tasks: inProgress,
+    completed_tasks: completed,
+    overdue_tasks: overdue,
+    completion_rate: Math.round(completionRate * 10000) / 10000,
+    has_tasks: total > 0,
+    total_milestones: milestones.length,
+    completed_milestones: completedMilestones,
+    next_due_task: nextDueTask
+      ? {
+          id: nextDueTask.id,
+          title: nextDueTask.title,
+          due_date: nextDueTask.due_date as string,
+        }
+      : null,
+    next_due_milestone: nextDueMilestone
+      ? {
+          id: nextDueMilestone.id,
+          title: nextDueMilestone.title,
+          due_date: nextDueMilestone.due_date as string,
+        }
+      : null,
+    is_overdue: isOverdue,
+  };
+}
+
+function computeMilestoneProgressForProject(
+  projectId: number,
+): MilestoneProgress[] {
+  const milestones = milestonesStore
+    .filter((m) => m.project_id === projectId)
+    .sort((a, b) => a.position - b.position);
+  return milestones.map((m) => {
+    const linked = tasksStore.filter(
+      (t) => t.project_milestone_id === m.id && t.project_id === projectId,
+    );
+    const total = linked.length;
+    const completed = linked.filter((t) => t.status === "done").length;
+    return {
+      id: m.id,
+      title: m.title,
+      status: m.status,
+      position: m.position,
+      due_date: m.due_date,
+      completed_at: m.completed_at,
+      total_tasks: total,
+      completed_tasks: completed,
+      completion_rate: total === 0 ? null : Math.round((completed / total) * 10000) / 10000,
+    };
+  });
 }
 
 export const handlers = [
@@ -343,8 +435,58 @@ export const handlers = [
     if (!project) {
       return HttpResponse.json({ message: "Not found." }, { status: 404 });
     }
-    return HttpResponse.json({ data: project }, { status: 200 });
+    const progress = computeProjectProgress(id);
+    const tasksForProject = tasksStore.filter((t) => t.project_id === id);
+    return HttpResponse.json(
+      {
+        data: {
+          ...project,
+          tasks_count: tasksForProject.length,
+          completed_tasks_count: tasksForProject.filter(
+            (t) => t.status === "done",
+          ).length,
+          progress,
+        },
+      },
+      { status: 200 },
+    );
   }),
+
+  http.get(`${API}/api/projects/:id/progress`, ({ params }) => {
+    const id = Number(params.id);
+    const project = projectsStore.find((p) => p.id === id);
+    if (!project) {
+      return HttpResponse.json({ message: "Not found." }, { status: 404 });
+    }
+    return HttpResponse.json(
+      {
+        data: {
+          project: computeProjectProgress(id),
+          milestones: computeMilestoneProgressForProject(id),
+        },
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.get(`${API}/api/projects/:id/activity`, ({ params, request }) => {
+    const id = Number(params.id);
+    const project = projectsStore.find((p) => p.id === id);
+    if (!project) {
+      return HttpResponse.json({ message: "Not found." }, { status: 404 });
+    }
+    const url = new URL(request.url);
+    const page = Number(url.searchParams.get("page") ?? "1");
+    const perPage = Number(url.searchParams.get("per_page") ?? "20");
+    const entries = mockProjectActivity.filter((e) => e.project_id === id);
+    return HttpResponse.json(paginateActivity(entries, page, perPage), {
+      status: 200,
+    });
+  }),
+
+  http.get(`${API}/api/dashboard`, () =>
+    HttpResponse.json({ data: mockDashboard }, { status: 200 }),
+  ),
 
   http.post(`${API}/api/projects`, async ({ request }) => {
     const body = (await request.json()) as CreateProjectPayload;

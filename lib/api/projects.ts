@@ -5,6 +5,7 @@ import type {
   PaginatedResource,
   Project,
   ProjectFilters,
+  ProjectProgressDetail,
   UpdateProjectPayload,
 } from "@/types/api";
 
@@ -66,4 +67,14 @@ export function updateProject(
 
 export function deleteProject(id: number): Promise<null> {
   return apiFetch<null>(`/api/projects/${id}`, { method: "DELETE" });
+}
+
+export function fetchProjectProgress(
+  id: number,
+  options: ServerOptions = {},
+): Promise<ApiResource<ProjectProgressDetail>> {
+  return apiFetch<ApiResource<ProjectProgressDetail>>(
+    `/api/projects/${id}/progress`,
+    { method: "GET", cookie: options.cookie },
+  );
 }

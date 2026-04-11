@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 
 import { AppHeader } from "@/components/layout/app-header";
 import { ProjectDetailView } from "@/components/projects/project-detail-view";
+import { fetchProjectActivity } from "@/lib/api/activity";
 import { ApiError } from "@/lib/api/errors";
 import { fetchProjectMilestones } from "@/lib/api/milestones";
-import { fetchProject } from "@/lib/api/projects";
+import { fetchProject, fetchProjectProgress } from "@/lib/api/projects";
 import { fetchProjectTasks } from "@/lib/api/tasks";
 import { buildForwardedCookieHeader } from "@/lib/auth/forward-cookies";
 import { requireAuth } from "@/lib/auth/guards";
@@ -43,9 +44,30 @@ export default async function ProjectDetailPage(
     throw err;
   }
 
+  // Non-critical fetches: tolerate failures so a broken progress/activity
+  // endpoint doesn't 500 the entire project page.
+  const [progressSettled, activitySettled] = await Promise.allSettled([
+    fetchProjectProgress(id, { cookie }),
+    fetchProjectActivity(id, { per_page: 20 }, { cookie }),
+  ]);
+
   const project = projectRes.data;
   const milestones = sortMilestonesByPosition(milestonesRes.data);
   const tasks = sortTasksByPosition(tasksRes.data);
+
+  const progressDetail =
+    progressSettled.status === "fulfilled"
+      ? progressSettled.value.data
+      : null;
+  const progressError = progressSettled.status === "rejected";
+
+  const activity =
+    activitySettled.status === "fulfilled"
+      ? activitySettled.value.data
+      : [];
+  const activityError = activitySettled.status === "rejected";
+
+  const inlineProgress = project.progress ?? progressDetail?.project ?? null;
 
   return (
     <>
@@ -54,6 +76,11 @@ export default async function ProjectDetailPage(
         project={project}
         milestones={milestones}
         tasks={tasks}
+        progress={inlineProgress}
+        progressDetail={progressDetail}
+        progressError={progressError}
+        activity={activity}
+        activityError={activityError}
       />
     </>
   );
