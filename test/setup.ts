@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
-import { resetClientsStore } from "./mocks/handlers";
+import { resetClientsStore, resetProjectsStore } from "./mocks/handlers";
 import { server } from "./mocks/server";
 
 // next/navigation is not available in jsdom; stub the hooks we use.
@@ -55,6 +55,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   resetClientsStore();
+  resetProjectsStore();
 });
 
 afterAll(() => {

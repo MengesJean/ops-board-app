@@ -80,3 +80,81 @@ export type ClientFilters = {
   page?: number;
   per_page?: number;
 };
+
+export const PROJECT_STATUSES = [
+  "draft",
+  "planned",
+  "active",
+  "on_hold",
+  "completed",
+  "cancelled",
+] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const PROJECT_PRIORITIES = ["low", "medium", "high"] as const;
+export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number];
+
+export const PROJECT_HEALTHS = ["good", "warning", "critical"] as const;
+export type ProjectHealth = (typeof PROJECT_HEALTHS)[number];
+
+export const PROJECT_SORTS = [
+  "updated_at",
+  "created_at",
+  "due_date",
+] as const;
+export type ProjectSort = (typeof PROJECT_SORTS)[number];
+
+export const PROJECT_DIRECTIONS = ["asc", "desc"] as const;
+export type ProjectDirection = (typeof PROJECT_DIRECTIONS)[number];
+
+export type ProjectClientEmbed = {
+  id: number;
+  name: string;
+  company_name: string | null;
+};
+
+export type Project = {
+  id: number;
+  client_id: number;
+  name: string;
+  reference: string | null;
+  description: string | null;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  health: ProjectHealth;
+  start_date: string | null;
+  due_date: string | null;
+  budget: string | null;
+  notes: string | null;
+  client?: ProjectClientEmbed;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateProjectPayload = {
+  client_id: number;
+  name: string;
+  reference?: string | null;
+  description?: string | null;
+  status: ProjectStatus;
+  priority: ProjectPriority;
+  health: ProjectHealth;
+  start_date?: string | null;
+  due_date?: string | null;
+  budget?: string | null;
+  notes?: string | null;
+};
+
+export type UpdateProjectPayload = Partial<CreateProjectPayload>;
+
+export type ProjectFilters = {
+  search?: string;
+  client_id?: number;
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
+  health?: ProjectHealth;
+  sort?: ProjectSort;
+  direction?: ProjectDirection;
+  page?: number;
+  per_page?: number;
+};

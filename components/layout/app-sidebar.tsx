@@ -5,6 +5,7 @@ import {
   Users,
   Wrench,
   BarChart3,
+  FolderKanban,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,13 +33,12 @@ type NavItem = {
 
 const MAIN_NAV: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Interventions", href: "/interventions", icon: Wrench },
   { title: "Clients", href: "/clients", icon: Users },
-  { title: "Reports", href: "/reports", icon: BarChart3 },
+  { title: "Projects", href: "/projects", icon: FolderKanban },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { title: "Settings", href: "/settings", icon: Settings },
+  // { title: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

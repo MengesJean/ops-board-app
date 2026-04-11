@@ -90,6 +90,7 @@ export function ClientsToolbar({ search, status, onAdd }: ClientsToolbarProps) {
           />
         </div>
         <Select
+          items={STATUS_LABEL}
           value={status ?? "all"}
           onValueChange={(value) => onStatusChange(value)}
         >

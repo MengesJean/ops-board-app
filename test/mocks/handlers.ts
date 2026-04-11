@@ -4,10 +4,20 @@ import type {
   Client,
   ClientStatus,
   CreateClientPayload,
+  CreateProjectPayload,
   Customer,
+  Project,
+  ProjectHealth,
+  ProjectPriority,
+  ProjectStatus,
   UpdateClientPayload,
+  UpdateProjectPayload,
 } from "@/types/api";
 import { mockClients, paginate } from "@/test/mocks/fixtures/clients";
+import {
+  mockProjects,
+  paginateProjects,
+} from "@/test/mocks/fixtures/projects";
 
 const API = "http://localhost:9999";
 
@@ -31,6 +41,30 @@ export function resetClientsStore(): void {
 
 export function getClientsStore(): Client[] {
   return clientsStore;
+}
+
+let projectsStore: Project[] = mockProjects.map((p) => ({ ...p }));
+let nextProjectId =
+  projectsStore.reduce((max, p) => Math.max(max, p.id), 0) + 1;
+
+export function resetProjectsStore(): void {
+  projectsStore = mockProjects.map((p) => ({ ...p }));
+  nextProjectId =
+    projectsStore.reduce((max, p) => Math.max(max, p.id), 0) + 1;
+}
+
+export function getProjectsStore(): Project[] {
+  return projectsStore;
+}
+
+function clientEmbed(clientId: number): Project["client"] {
+  const client = clientsStore.find((c) => c.id === clientId);
+  if (!client) return undefined;
+  return {
+    id: client.id,
+    name: client.name,
+    company_name: client.company_name,
+  };
 }
 
 function nowIso(): string {
@@ -187,6 +221,142 @@ export const handlers = [
       return HttpResponse.json({ message: "Not found." }, { status: 404 });
     }
     clientsStore = clientsStore.filter((c) => c.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(`${API}/api/projects`, ({ request }) => {
+    const url = new URL(request.url);
+    const search = url.searchParams.get("search")?.toLowerCase().trim() ?? "";
+    const status = url.searchParams.get("status") as ProjectStatus | null;
+    const priority = url.searchParams.get("priority") as ProjectPriority | null;
+    const health = url.searchParams.get("health") as ProjectHealth | null;
+    const clientId = url.searchParams.get("client_id");
+    const page = Number(url.searchParams.get("page") ?? "1");
+    const perPage = Number(url.searchParams.get("per_page") ?? "15");
+
+    let filtered = projectsStore;
+    if (status) filtered = filtered.filter((p) => p.status === status);
+    if (priority) filtered = filtered.filter((p) => p.priority === priority);
+    if (health) filtered = filtered.filter((p) => p.health === health);
+    if (clientId) {
+      const cid = Number(clientId);
+      filtered = filtered.filter((p) => p.client_id === cid);
+    }
+    if (search) {
+      filtered = filtered.filter((p) =>
+        [p.name, p.reference]
+          .filter(Boolean)
+          .some((v) => (v as string).toLowerCase().includes(search)),
+      );
+    }
+    return HttpResponse.json(paginateProjects(filtered, page, perPage), {
+      status: 200,
+    });
+  }),
+
+  http.get(`${API}/api/projects/:id`, ({ params }) => {
+    const id = Number(params.id);
+    const project = projectsStore.find((p) => p.id === id);
+    if (!project) {
+      return HttpResponse.json({ message: "Not found." }, { status: 404 });
+    }
+    return HttpResponse.json({ data: project }, { status: 200 });
+  }),
+
+  http.post(`${API}/api/projects`, async ({ request }) => {
+    const body = (await request.json()) as CreateProjectPayload;
+    const errors: Record<string, string[]> = {};
+    if (!body.name || body.name.trim() === "") {
+      errors.name = ["The name field is required."];
+    }
+    if (!body.client_id) {
+      errors.client_id = ["The client id field is required."];
+    }
+    if (body.name === "Conflict") {
+      errors.name = ["The name has already been taken."];
+    }
+    if (Object.keys(errors).length > 0) {
+      return HttpResponse.json(
+        { message: "The given data was invalid.", errors },
+        { status: 422 },
+      );
+    }
+    const project: Project = {
+      id: nextProjectId++,
+      client_id: body.client_id,
+      name: body.name,
+      reference: body.reference ?? null,
+      description: body.description ?? null,
+      status: body.status,
+      priority: body.priority,
+      health: body.health,
+      start_date: body.start_date ?? null,
+      due_date: body.due_date ?? null,
+      budget: body.budget ?? null,
+      notes: body.notes ?? null,
+      client: clientEmbed(body.client_id),
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    projectsStore = [project, ...projectsStore];
+    return HttpResponse.json({ data: project }, { status: 201 });
+  }),
+
+  http.patch(`${API}/api/projects/:id`, async ({ params, request }) => {
+    const id = Number(params.id);
+    const body = (await request.json()) as UpdateProjectPayload;
+    const index = projectsStore.findIndex((p) => p.id === id);
+    if (index === -1) {
+      return HttpResponse.json({ message: "Not found." }, { status: 404 });
+    }
+    if (body.name !== undefined && body.name.trim() === "") {
+      return HttpResponse.json(
+        {
+          message: "The given data was invalid.",
+          errors: { name: ["The name field is required."] },
+        },
+        { status: 422 },
+      );
+    }
+    const current = projectsStore[index];
+    const nextClientId = body.client_id ?? current.client_id;
+    const updated: Project = {
+      ...current,
+      ...body,
+      client_id: nextClientId,
+      reference:
+        body.reference === undefined ? current.reference : (body.reference ?? null),
+      description:
+        body.description === undefined
+          ? current.description
+          : (body.description ?? null),
+      start_date:
+        body.start_date === undefined
+          ? current.start_date
+          : (body.start_date ?? null),
+      due_date:
+        body.due_date === undefined ? current.due_date : (body.due_date ?? null),
+      budget:
+        body.budget === undefined ? current.budget : (body.budget ?? null),
+      notes: body.notes === undefined ? current.notes : (body.notes ?? null),
+      client: clientEmbed(nextClientId) ?? current.client,
+      updated_at: nowIso(),
+    };
+    projectsStore = [
+      ...projectsStore.slice(0, index),
+      updated,
+      ...projectsStore.slice(index + 1),
+    ];
+    return HttpResponse.json({ data: updated }, { status: 200 });
+  }),
+
+  http.delete(`${API}/api/projects/:id`, ({ params }) => {
+    const id = Number(params.id);
+    const exists = projectsStore.some((p) => p.id === id);
+    if (!exists) {
+      return HttpResponse.json({ message: "Not found." }, { status: 404 });
+    }
+    projectsStore = projectsStore.filter((p) => p.id !== id);
     return new HttpResponse(null, { status: 204 });
   }),
 ];
