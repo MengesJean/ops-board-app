@@ -1,8 +1,10 @@
 > **Projet de démo portfolio.** OpsBoard est un projet de démonstration développé pour mon portfolio : [www.mengesjean.fr](https://www.mengesjean.fr). Il n'a pas vocation à être déployé en production — c'est un terrain d'expérimentation pour montrer une stack moderne, des patterns d'architecture propres et une vraie réflexion produit.
 
+> 🔗 **Repo back** : [github.com/MengesJean/ops-board-api](https://github.com/MengesJean/ops-board-api) — API Laravel 12 consommée par ce front.
+
 # OpsBoard — Frontend
 
-Interface Next.js d'**OpsBoard**, un outil de pilotage métier qui permet à un freelance ou une petite équipe de gérer ses clients, ses projets et l'avancement opérationnel au quotidien. Le front consomme l'API Laravel du repo `../api` via Sanctum (SPA stateful) et offre une UX résolument tournée vers l'**aide à la décision** : où en est ce projet, qu'est-ce qui bloque, quelles sont les priorités du moment.
+Interface Next.js d'**OpsBoard**, un outil de pilotage métier qui permet à un freelance ou une petite équipe de gérer ses clients, ses projets et l'avancement opérationnel au quotidien. Le front consomme l'API Laravel du repo [`ops-board-api`](https://github.com/MengesJean/ops-board-api) via Sanctum (SPA stateful) et offre une UX résolument tournée vers l'**aide à la décision** : où en est ce projet, qu'est-ce qui bloque, quelles sont les priorités du moment.
 
 ## Fonctionnalités
 
